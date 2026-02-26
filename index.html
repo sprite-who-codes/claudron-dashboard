@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claudron Dashboard 🧪</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0f0f0f;
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .header h1 {
+    font-size: 2.5em;
+    background: linear-gradient(135deg, #f7b731, #fc5c65, #a55eea);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 4px;
+  }
+  .header .subtitle {
+    color: #888;
+    font-size: 0.95em;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 16px;
+    padding: 24px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: #444; }
+  .card h2 {
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #888;
+    margin-bottom: 16px;
+  }
+  .stat {
+    font-size: 2.2em;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .stat-label {
+    color: #666;
+    font-size: 0.85em;
+  }
+  .progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #2a2a2a;
+    border-radius: 4px;
+    margin: 12px 0 6px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+  .fill-green { background: linear-gradient(90deg, #26de81, #20bf6b); }
+  .fill-yellow { background: linear-gradient(90deg, #f7b731, #fa8231); }
+  .fill-red { background: linear-gradient(90deg, #fc5c65, #eb3b5a); }
+  .status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+    animation: pulse 2s infinite;
+  }
+  .dot-green { background: #26de81; box-shadow: 0 0 8px #26de8166; }
+  .dot-red { background: #fc5c65; box-shadow: 0 0 8px #fc5c6566; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .service-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #222;
+  }
+  .service-row:last-child { border-bottom: none; }
+  .service-name { flex: 1; }
+  .service-status { font-size: 0.9em; }
+  .music-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .music-icon { font-size: 2em; }
+  .music-details { flex: 1; }
+  .music-track { font-weight: 600; font-size: 1.1em; }
+  .music-artist { color: #888; }
+  .birthday-banner {
+    background: linear-gradient(135deg, #a55eea22, #fc5c6522);
+    border: 1px solid #a55eea44;
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    margin-bottom: 20px;
+    max-width: 1200px;
+    margin: 0 auto 20px;
+  }
+  .refresh-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    padding: 12px 20px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.2s;
+  }
+  .refresh-btn:hover { background: #333; }
+  .last-updated {
+    text-align: center;
+    color: #555;
+    font-size: 0.8em;
+    margin-top: 24px;
+  }
+  .sticker-tags {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .tag {
+    background: #2a2a2a;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    color: #aaa;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🧪 Claudron</h1>
+  <div class="subtitle">Family Bot • Born Feb 14, 2026 • Emotional Support Demon</div>
+</div>
+
+<div id="birthday-banner" class="birthday-banner" style="display:none;">
+  🎂 It's my birthday! 🎉
+</div>
+
+<div class="grid">
+  <!-- Health -->
+  <div class="card">
+    <h2>❤️ Health</h2>
+    <div id="health-status">
+      <div class="service-row">
+        <span class="status-dot dot-green"></span>
+        <span class="service-name">Claudron</span>
+        <span class="service-status" id="uptime">Online</span>
+      </div>
+      <div class="service-row">
+        <span class="status-dot" id="telegram-dot"></span>
+        <span class="service-name">Telegram</span>
+        <span class="service-status" id="telegram-status">Checking...</span>
+      </div>
+      <div class="service-row">
+        <span class="status-dot" id="spotify-dot"></span>
+        <span class="service-name">Spotify</span>
+        <span class="service-status" id="spotify-status">Checking...</span>
+      </div>
+      <div class="service-row">
+        <span class="status-dot" id="google-dot"></span>
+        <span class="service-name">Google Workspace</span>
+        <span class="service-status" id="google-status">Checking...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Window -->
+  <div class="card">
+    <h2>🧠 Brain</h2>
+    <div class="stat" id="context-pct">---%</div>
+    <div class="stat-label">Context Window Used</div>
+    <div class="progress-bar">
+      <div class="progress-fill fill-green" id="context-bar" style="width: 0%"></div>
+    </div>
+    <div class="stat-label" id="context-detail">Loading...</div>
+    <div style="margin-top: 16px;">
+      <div class="stat-label">Model: <strong id="model-name">---</strong></div>
+      <div class="stat-label">Compactions: <strong id="compactions">---</strong></div>
+    </div>
+  </div>
+
+  <!-- Identity -->
+  <div class="card">
+    <h2>🪪 Identity</h2>
+    <div style="font-size: 3em; text-align: center; margin: 8px 0;">🧪</div>
+    <div style="text-align: center;">
+      <div style="font-size: 1.3em; font-weight: 700;">Claudron</div>
+      <div class="stat-label">Voice: Liam • Emoji: 🧪</div>
+      <div class="sticker-tags" style="justify-content: center;">
+        <span class="tag">😈 Emotional Support Demon</span>
+        <span class="tag">🦝 Trash Can, Not Trash Can't</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Music -->
+  <div class="card">
+    <h2>🎵 Now Playing</h2>
+    <div class="music-info">
+      <div class="music-icon" id="music-icon">🎵</div>
+      <div class="music-details">
+        <div class="music-track" id="music-track">Checking...</div>
+        <div class="music-artist" id="music-artist"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Family -->
+  <div class="card">
+    <h2>👨‍👩‍👧‍👦 Family</h2>
+    <div class="service-row">
+      <span class="service-name">👤 Ryan</span>
+      <span class="service-status">Papa / Admin</span>
+    </div>
+    <div class="service-row">
+      <span class="service-name">👤 Miranda</span>
+      <span class="service-status">Mama / Trash Panda</span>
+    </div>
+    <div class="service-row">
+      <span class="service-name">🐕 Paul</span>
+      <span class="service-status">Cream • 7yo • 12lbs</span>
+    </div>
+    <div class="service-row">
+      <span class="service-name">🐕 Lucy</span>
+      <span class="service-status">Chocolate • 9yo • 7lbs</span>
+    </div>
+  </div>
+
+  <!-- Quick Stats -->
+  <div class="card">
+    <h2>📊 Session</h2>
+    <div class="service-row">
+      <span class="service-name">Context Used</span>
+      <span class="service-status" id="tokens-in">---</span>
+    </div>
+    <div class="service-row">
+      <span class="service-name">Context Max</span>
+      <span class="service-status" id="tokens-out">---</span>
+    </div>
+    <div class="service-row">
+      <span class="service-name">Session</span>
+      <span class="service-status" id="session-name">---</span>
+    </div>
+    <div class="service-row">
+      <span class="service-name">Compactions</span>
+      <span class="service-status" id="session-compactions">---</span>
+    </div>
+    <div class="service-row">
+      <span class="service-name">Age</span>
+      <span class="service-status" id="age">---</span>
+    </div>
+  </div>
+</div>
+
+<div class="last-updated">Last updated: <span id="last-updated">never</span></div>
+
+<button class="refresh-btn" onclick="location.reload()">↻ Refresh</button>
+
+<script>
+  async function refresh() {
+    try {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+
+      // Birthday
+      if (data.birthday) {
+        document.getElementById('birthday-banner').style.display = 'block';
+      }
+
+      // Age
+      const el = document.getElementById('age');
+      if (data.ageDays === 0) el.textContent = 'Born today! 🎂';
+      else if (data.ageDays < 30) el.textContent = `${data.ageDays} days old`;
+      else if (data.ageDays < 365) el.textContent = `${Math.floor(data.ageDays / 30)} months old`;
+      else el.textContent = `${Math.floor(data.ageDays / 365)} years old`;
+
+      // Telegram
+      const tDot = document.getElementById('telegram-dot');
+      const tStatus = document.getElementById('telegram-status');
+      tDot.className = `status-dot ${data.telegram ? 'dot-green' : 'dot-red'}`;
+      tStatus.textContent = data.telegram ? 'Connected' : 'Offline';
+
+      // Google
+      const gDot = document.getElementById('google-dot');
+      const gStatus = document.getElementById('google-status');
+      gDot.className = `status-dot ${data.google ? 'dot-green' : 'dot-red'}`;
+      gStatus.textContent = data.google ? 'Connected' : 'Offline';
+
+      // Spotify
+      const sDot = document.getElementById('spotify-dot');
+      const sStatus = document.getElementById('spotify-status');
+      const mTrack = document.getElementById('music-track');
+      const mArtist = document.getElementById('music-artist');
+      const mIcon = document.getElementById('music-icon');
+
+      if (data.spotify) {
+        sDot.className = 'status-dot dot-green';
+        sStatus.textContent = 'Connected';
+        if (data.spotify.track) {
+          mTrack.textContent = data.spotify.track;
+          mArtist.textContent = data.spotify.artist;
+          mIcon.textContent = data.spotify.state === 'PLAYING' ? '▶️' : '⏸️';
+        } else if (data.spotify.raw) {
+          mTrack.textContent = data.spotify.raw;
+          mArtist.textContent = '';
+          mIcon.textContent = '🎵';
+        }
+      } else {
+        sDot.className = 'status-dot dot-red';
+        sStatus.textContent = 'Offline';
+        mTrack.textContent = 'Nothing playing';
+        mArtist.textContent = '';
+        mIcon.textContent = '🎵';
+      }
+
+      // Brain
+      if (data.brain) {
+        const pct = data.brain.contextPct || 0;
+        document.getElementById('context-pct').textContent = pct + '%';
+        document.getElementById('context-bar').style.width = pct + '%';
+        document.getElementById('context-bar').className = 'progress-fill ' + 
+          (pct < 60 ? 'fill-green' : pct < 85 ? 'fill-yellow' : 'fill-red');
+        document.getElementById('context-detail').textContent = 
+          `${data.brain.contextUsed || '?'} / ${data.brain.contextMax || '200k'} tokens`;
+        document.getElementById('model-name').textContent = data.brain.model || 'claude-opus-4-6';
+      }
+
+      // Session
+      document.getElementById('session-compactions').textContent = data.session?.compactions || 0;
+      document.getElementById('tokens-in').textContent = data.brain?.contextUsed || '---';
+      document.getElementById('tokens-out').textContent = data.brain?.contextMax || '---';
+      document.getElementById('session-name').textContent = 'main';
+
+      // Timestamp
+      document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+
+    } catch (e) {
+      console.error('Failed to fetch status:', e);
+    }
+  }
+
+  // Refresh every 30 seconds
+  refresh();
+  setInterval(refresh, 30000);
+</script>
+
+</body>
+</html>
