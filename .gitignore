@@ -6,3 +6,7 @@ screenshot.png
 selfie.png
 record_demo.py
 walk-tour.sh
+sprites/body-v*.png
+sprites/body-v*.jpg
+sprites/body-silhouette.png
+sprites/github-avatar*
