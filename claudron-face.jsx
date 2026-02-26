@@ -226,8 +226,12 @@ export const render = ({ output }) => {
       cssBottom = (SCREEN_H - loc.y) - offset.mouthFromBottom;
 
       // Determine flip direction: sprite faces RIGHT by default
-      // Manual override via locData.facing ("left" or "right")
-      if (locData.facing === 'left') {
+      // Priority: per-location facing > global facing override > movement direction
+      if (loc.facing === 'left') {
+        facingLeft = true;
+      } else if (loc.facing === 'right') {
+        facingLeft = false;
+      } else if (locData.facing === 'left') {
         facingLeft = true;
       } else if (locData.facing === 'right') {
         facingLeft = false;
