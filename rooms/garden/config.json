@@ -7,36 +7,42 @@
       "x": 0.2,
       "y": 0.82,
       "facing": "right",
+      "rotation": 0,
       "emoji": "📍"
     },
     "path_entrance": {
       "x": 0.37,
       "y": 0.5,
       "facing": "right",
+      "rotation": 0,
       "emoji": "📍"
     },
     "path_center": {
       "x": 0.43,
       "y": 0.7,
       "facing": "right",
+      "rotation": 0,
       "emoji": "📍"
     },
     "path_end": {
       "x": 0.43,
       "y": 1,
       "facing": "right",
+      "rotation": 0,
       "emoji": "📍"
     },
     "garden": {
       "x": 0.88,
       "y": 0.7,
       "facing": "left",
+      "rotation": 0,
       "emoji": "📍"
     },
     "tree": {
       "x": 0.085,
       "y": 0.55,
       "facing": "right",
+      "rotation": 0,
       "emoji": "📍"
     }
   }

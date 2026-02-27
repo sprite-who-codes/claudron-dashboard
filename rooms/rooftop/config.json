@@ -7,24 +7,28 @@
       "x": 0.33,
       "y": 0.65,
       "facing": "left",
+      "rotation": 0,
       "emoji": "📍"
     },
     "mug": {
       "x": 0.38,
       "y": 0.6,
       "facing": "left",
+      "rotation": 0,
       "emoji": "📍"
     },
     "stars": {
       "x": 0.78,
       "y": 0.56,
       "facing": "right",
+      "rotation": 0,
       "emoji": "📍"
     },
     "moon": {
       "x": 0.7,
       "y": 0.5,
       "facing": "left",
+      "rotation": 0,
       "emoji": "📍"
     }
   }
