@@ -125,7 +125,7 @@ const LOCATIONS_FILE = path.join(DASH_DIR, 'locations.json');
 const server = http.createServer((req, res) => {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
@@ -167,6 +167,110 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ error: e.message }));
       }
     });
+    return;
+  }
+
+  // GET /api/state
+  if (req.url === '/api/state' && req.method === 'GET') {
+    try {
+      const data = fs.readFileSync(path.join(DASH_DIR, 'state.json'), 'utf8');
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+      res.end(data);
+    } catch (e) {
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: 'Failed to read state.json' }));
+    }
+    return;
+  }
+
+  // PUT /api/room/:name/location/:loc — update a location's x/y
+  const locPutMatch = req.url.match(/^\/api\/room\/([a-z_-]+)\/location\/([a-z_-]+)$/);
+  if (locPutMatch && req.method === 'PUT') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const update = JSON.parse(body);
+        const cfgPath = path.join(DASH_DIR, 'rooms', locPutMatch[1], 'config.json');
+        const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+        if (!cfg.locations[locPutMatch[2]]) {
+          res.writeHead(404);
+          res.end(JSON.stringify({ error: 'Location not found' }));
+          return;
+        }
+        if (update.x !== undefined) cfg.locations[locPutMatch[2]].x = update.x;
+        if (update.y !== undefined) cfg.locations[locPutMatch[2]].y = update.y;
+        if (update.facing !== undefined) cfg.locations[locPutMatch[2]].facing = update.facing;
+        if (update.rotation !== undefined) cfg.locations[locPutMatch[2]].rotation = update.rotation;
+        if (update.mood !== undefined) cfg.locations[locPutMatch[2]].mood = update.mood;
+        if (update.mood === '') delete cfg.locations[locPutMatch[2]].mood;
+        fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + '\n');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // DELETE /api/room/:name/location/:loc
+  if (locPutMatch && req.method === 'DELETE') {
+    try {
+      const cfgPath = path.join(DASH_DIR, 'rooms', locPutMatch[1], 'config.json');
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+      if (!cfg.locations[locPutMatch[2]]) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Location not found' }));
+        return;
+      }
+      delete cfg.locations[locPutMatch[2]];
+      fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + '\n');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+    } catch (e) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // POST /api/room/:name/location — create new location
+  const locPostMatch = req.url.match(/^\/api\/room\/([a-z_-]+)\/location$/);
+  if (locPostMatch && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const { name: locName, x, y, facing, emoji } = JSON.parse(body);
+        if (!locName) { res.writeHead(400); res.end(JSON.stringify({ error: 'name required' })); return; }
+        const cfgPath = path.join(DASH_DIR, 'rooms', locPostMatch[1], 'config.json');
+        const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+        if (cfg.locations[locName]) { res.writeHead(409); res.end(JSON.stringify({ error: 'Location already exists' })); return; }
+        cfg.locations[locName] = { x: x || 0.5, y: y || 0.5, facing: facing || 'right', emoji: emoji || '📍' };
+        fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + '\n');
+        res.writeHead(201, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // GET /api/room/:name
+  const roomMatch = req.url.match(/^\/api\/room\/([a-z_-]+)$/);
+  if (roomMatch && req.method === 'GET') {
+    try {
+      const data = fs.readFileSync(path.join(DASH_DIR, 'rooms', roomMatch[1], 'config.json'), 'utf8');
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+      res.end(data);
+    } catch (e) {
+      res.writeHead(404);
+      res.end(JSON.stringify({ error: 'Room not found' }));
+    }
     return;
   }
 

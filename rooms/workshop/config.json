@@ -1,0 +1,61 @@
+{
+  "name": "Workshop",
+  "emoji": "🧪",
+  "wallpaper": "wallpaper.png",
+  "locations": {
+    "bookshelf": {
+      "x": 0.207,
+      "y": 0.725,
+      "facing": "left",
+      "emoji": "📚"
+    },
+    "fireplace": {
+      "x": 0.39,
+      "y": 0.78,
+      "facing": "left",
+      "emoji": "🔥"
+    },
+    "cauldron": {
+      "x": 0.36,
+      "y": 0.83,
+      "facing": "right",
+      "emoji": "🧪"
+    },
+    "cauldron_right": {
+      "x": 0.59,
+      "y": 0.7,
+      "facing": "left",
+      "emoji": "🧪"
+    },
+    "crystal_ball": {
+      "x": 0.6,
+      "y": 0.6,
+      "facing": "right",
+      "emoji": "🔮"
+    },
+    "stool": {
+      "x": 0.75,
+      "y": 1,
+      "facing": "left",
+      "emoji": "🪑"
+    },
+    "desk": {
+      "x": 0.73,
+      "y": 0.78,
+      "facing": "right",
+      "emoji": "📝"
+    },
+    "fireplace_right": {
+      "x": 0.3,
+      "y": 0.8,
+      "facing": "right",
+      "emoji": "📍"
+    },
+    "clock": {
+      "x": 0.38,
+      "y": 0.5,
+      "facing": "left",
+      "emoji": "📍"
+    }
+  }
+}

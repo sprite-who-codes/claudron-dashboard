@@ -1,0 +1,31 @@
+{
+  "name": "Rooftop",
+  "emoji": "🔭",
+  "wallpaper": "wallpaper.png",
+  "locations": {
+    "book": {
+      "x": 0.33,
+      "y": 0.65,
+      "facing": "left",
+      "emoji": "📍"
+    },
+    "mug": {
+      "x": 0.38,
+      "y": 0.6,
+      "facing": "left",
+      "emoji": "📍"
+    },
+    "stars": {
+      "x": 0.78,
+      "y": 0.56,
+      "facing": "right",
+      "emoji": "📍"
+    },
+    "moon": {
+      "x": 0.7,
+      "y": 0.5,
+      "facing": "left",
+      "emoji": "📍"
+    }
+  }
+}

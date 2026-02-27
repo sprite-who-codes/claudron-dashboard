@@ -1,0 +1,32 @@
+{
+  "name": "Bedroom",
+  "emoji": "🛏️",
+  "wallpaper": "wallpaper.png",
+  "locations": {
+    "bed": {
+      "x": 0.61,
+      "y": 0.72,
+      "facing": "left",
+      "rotation": 60,
+      "emoji": "🛏️"
+    },
+    "window": {
+      "x": 0.4,
+      "y": 0.5,
+      "facing": "left",
+      "emoji": "📍"
+    },
+    "candle": {
+      "x": 0.26,
+      "y": 0.75,
+      "facing": "left",
+      "emoji": "📍"
+    },
+    "bookshelf_right": {
+      "x": 0.75,
+      "y": 0.6,
+      "facing": "right",
+      "emoji": "📍"
+    }
+  }
+}
