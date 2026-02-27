@@ -218,7 +218,7 @@ const server = http.createServer(async (req, res) => {
   // --- Route: GET /api/state ---
   if (req.url === '/api/state' && req.method === 'GET') {
     try {
-      const data = fs.readFileSync(path.join(DASH_DIR, 'state.json'), 'utf8');
+      const data = fs.readFileSync(path.join(DASH_DIR, 'data', 'state.json'), 'utf8');
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
       res.end(data);
     } catch {
@@ -360,9 +360,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // --- Static file serving ---
+  // --- Static file serving (check public/ first, then root) ---
   let filePath = req.url === '/' ? '/index.html' : req.url;
-  filePath = path.join(DASH_DIR, filePath);
+  const publicPath = path.join(DASH_DIR, 'public', filePath);
+  filePath = fs.existsSync(publicPath) ? publicPath : path.join(DASH_DIR, filePath);
 
   const ext = path.extname(filePath);
   const contentType = MIME_TYPES[ext] || 'text/plain';
