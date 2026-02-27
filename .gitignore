@@ -1,16 +1,25 @@
-avatar-ref.png
-demo.mp4
-screen-grid.png
-screen-grid-overlay.png
-screenshot.png
-selfie.png
-record_demo.py
-walk-tour.sh
+# Assets (large/reference images)
+assets/avatar-ref.png
+assets/demo.mp4
+assets/screen-grid.png
+assets/screen-grid-overlay.png
+assets/screenshot.png
+assets/selfie.png
+
+# Scripts (dev/utility)
+scripts/record_demo.py
+scripts/walk-tour.sh
+
+# Sprites (drafts)
 sprites/body-v*.png
 sprites/body-v*.jpg
 sprites/body-silhouette.png
 sprites/github-avatar*
+
+# Legacy state files (still read by Übersicht widget)
 brain.json
 mood.json
 locations.json
-wallpaper-grid*.png
+
+# Wallpaper grids (overlays)
+wallpapers/wallpaper-grid*.png

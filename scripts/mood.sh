@@ -4,7 +4,7 @@
 # Example: ./mood.sh happy "hey! 👋"
 #          ./mood.sh sleeping
 
-MOOD_FILE="$(dirname "$0")/mood.json"
+MOOD_FILE="$(dirname "$0")/../mood.json"
 VALID_MOODS="happy thinking sleeping angry excited"
 
 mood="${1:-happy}"

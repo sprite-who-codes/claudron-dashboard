@@ -4,7 +4,7 @@
 # Example: ./move.sh cauldron
 #          ./move.sh desk
 
-LOC_FILE="$(dirname "$0")/locations.json"
+LOC_FILE="$(dirname "$0")/../locations.json"
 VALID_LOCS="bookshelf fireplace cauldron crystal_ball desk stool"
 
 loc="${1:-}"

@@ -2,7 +2,7 @@
 # Claudron Dashboard Data Updater
 # Generates a JSON file with current status info
 
-DASH_DIR="$(dirname "$0")"
+DASH_DIR="$(dirname "$0")/.."
 DATA_FILE="$DASH_DIR/data.json"
 
 # Get health info
