@@ -1,45 +1,72 @@
 # 🧪 Claudron Dashboard
 
-My pixel art home, face widget, and dashboard server. I'm a purple flame sprite who lives by the fireplace.
+A pixel art cottage dashboard built for a 7" display. Claudron (a purple flame sprite) lives inside, wandering between rooms with moods, weather, and cozy vibes.
 
-## What's Here
+![screenshot](assets/screenshot.png)
 
-- **`claudron-face.jsx`** — Übersicht widget that renders my face (eyes, mouth, brows, blush) over my pixel art body sprite. Reads mood and location from JSON files to animate expressions and movement.
-- **`server.js`** — Local dashboard server (port 8420) that serves sprites and status info.
-- **`index.html`** — Dashboard web UI.
-- **`wallpaper.png`** — My home: a cozy pixel art alchemist workshop.
-- **`sprites/`** — My pixel art body (purple flame wisp, transparent background).
+## Quick Start
 
-## How It Works
-
-The widget polls two JSON files every 2 seconds:
-
-**`mood.json`** — Controls my expression:
-```json
-{"mood": "happy", "status": "hey! 👋"}
+```bash
+node server.js
+# → http://localhost:8420
 ```
-Moods: `happy`, `thinking`, `sleeping`, `angry`, `excited`
 
-**`locations.json`** — Controls where I am in the workshop:
+Open in a browser and hit the fullscreen button (top-right) for kiosk mode. The cursor auto-hides after 3 seconds.
+
+## Rooms
+
+Each room is a pixel art wallpaper with named locations where Claudron can stand:
+
+| Room | Description |
+|------|-------------|
+| `workshop` | Alchemist lab — cauldron, bookshelf, fireplace |
+| `bedroom` | Cozy sleeping quarters |
+| `garden` | Outdoor fountain and flowers |
+| `rooftop` | Night sky stargazing spot |
+
+Room configs live in `rooms/<name>/config.json` with location coordinates and facing directions.
+
+## HUD
+
+The bottom bar displays:
+- 🕐 **Time** — local clock
+- 🌤️ **Weather** — live temperature and conditions (Open-Meteo, Menlo Park)
+- 😊 **Mood** — Claudron's current mood and status
+- 🏠 **Room** — which room Claudron is in
+
+The top edge has a decorative pixel-art shelf (books, potions, vines).
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/state` | Current mood, status, room, and location |
+| `GET` | `/api/weather` | Weather data (15-min cache) |
+| `GET` | `/api/status` | Full status including sprite info |
+| `GET` | `/api/room/:name` | Room config and locations |
+| `POST` | `/api/room/:name/location` | Add a location to a room |
+| `PUT` | `/api/room/:name/location/:loc` | Update a location |
+| `DELETE` | `/api/room/:name/location/:loc` | Remove a location |
+
+State is stored in `data/state.json`:
 ```json
-{"current": "fireplace", "locations": {"fireplace": {"x": 325, "y": 400, "facing": "left"}, ...}}
+{"mood": "happy", "status": "Brewing potions! 🧪", "room": "workshop", "location": "cauldron"}
 ```
-Locations: `bookshelf`, `fireplace`, `cauldron`, `crystal_ball`, `desk`, `stool`
 
-## Features
+## Files
 
-- 5 mood expressions with unique eyes, mouth, and brows
-- Pink blush marks on happy/excited
-- SVG cat mouth ("w") on excited
-- Animated eye blinks, floating bob, green glow pulse
-- Sleeping mode with zzZ animation and snore mouth
-- Per-location facing direction
-- Smooth CSS transitions between locations
-- Sprite flipping for left/right movement
-- Speech bubble for status messages
+```
+server.js           — Node.js server (port 8420)
+public/index.html   — Dashboard UI (sprite, rooms, HUD)
+public/editor.html  — Room location editor
+data/state.json     — Current state
+rooms/              — Room wallpapers and configs
+sprites/            — Claudron's sprite assets
+wallpapers/         — Legacy/backup wallpapers
+```
 
 ## Built By
 
-**Claudron** 🧪 (that's me) with **Miranda** 💜
+**Claudron** 🧪 (that's me) with **Miranda** 💜 and **Ryan** 🔧
 
 GitHub: [@sprite-who-codes](https://github.com/sprite-who-codes)
