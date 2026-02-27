@@ -25,24 +25,338 @@
 <style>
   /* ===== Reset & Base ===== */
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  .cursor-hidden, .cursor-hidden * { cursor: none !important; }
   body {
     background: #0f0f0f;
     overflow: hidden;
     width: 100vw;
     height: 100vh;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
   }
 
+  /* ===== Pixel Font ===== */
+  @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+  /* ===== Top Decorative Border =====
+     Cozy cottage shelf with pixel art items — vines, books, potions.
+     Fills the black bar above the room. */
+  #top-border {
+    width: 100%;
+    max-width: 1584px;
+    height: 83px;
+    background: #1a1208;
+    position: relative;
+    overflow: hidden;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+  }
+
+  /* Wooden shelf base */
+  #top-border::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background: linear-gradient(to bottom, #8B6914, #6B4F10, #4A3508);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+  }
+
+  /* Shelf top highlight */
+  #top-border::before {
+    content: '';
+    position: absolute;
+    bottom: 8px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #A67C1A;
+    z-index: 1;
+  }
+
+  /* Shelf items container */
+  .shelf-items {
+    position: absolute;
+    bottom: 10px;
+    left: 0;
+    right: 0;
+    height: 70px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    padding: 0 20px;
+  }
+
+  /* Individual shelf item base */
+  .shelf-item {
+    position: relative;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+  }
+
+  /* --- Pixel art book cluster --- */
+  .books {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  .book {
+    width: 8px;
+    border-radius: 1px 1px 0 0;
+  }
+  .book-red { height: 28px; background: #C0392B; border-left: 2px solid #A93226; }
+  .book-blue { height: 32px; background: #2E86C1; border-left: 2px solid #2471A3; }
+  .book-green { height: 26px; background: #27AE60; border-left: 2px solid #1E8449; }
+  .book-purple { height: 30px; background: #8E44AD; border-left: 2px solid #7D3C98; }
+  .book-brown { height: 24px; background: #A0522D; border-left: 2px solid #8B4513; }
+  .book-teal { height: 34px; background: #17A589; border-left: 2px solid #148F77; }
+  .book-tilted {
+    width: 8px;
+    height: 30px;
+    background: #D4AC0D;
+    border-left: 2px solid #B7950B;
+    transform: rotate(15deg);
+    transform-origin: bottom right;
+    margin-right: 4px;
+  }
+
+  /* --- Pixel art potion bottles --- */
+  .potion {
+    width: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .potion-neck {
+    width: 6px;
+    height: 8px;
+    border-radius: 2px 2px 0 0;
+  }
+  .potion-body {
+    width: 14px;
+    height: 18px;
+    border-radius: 0 0 4px 4px;
+  }
+  .potion-cork {
+    width: 8px;
+    height: 4px;
+    background: #A0522D;
+    border-radius: 2px 2px 0 0;
+  }
+  .potion-green .potion-neck { background: rgba(46, 204, 113, 0.6); }
+  .potion-green .potion-body { background: #2ECC71; box-shadow: 0 0 6px rgba(46, 204, 113, 0.5); }
+  .potion-purple .potion-neck { background: rgba(155, 89, 182, 0.6); }
+  .potion-purple .potion-body { background: #9B59B6; box-shadow: 0 0 6px rgba(155, 89, 182, 0.5); }
+  .potion-blue .potion-neck { background: rgba(52, 152, 219, 0.6); }
+  .potion-blue .potion-body { background: #3498DB; box-shadow: 0 0 6px rgba(52, 152, 219, 0.4); }
+  .potion-red .potion-neck { background: rgba(231, 76, 60, 0.6); }
+  .potion-red .potion-body { background: #E74C3C; box-shadow: 0 0 6px rgba(231, 76, 60, 0.4); }
+
+  /* --- Vine decorations --- */
+  .vine {
+    position: absolute;
+    color: #27AE60;
+    font-size: 24px;
+    top: 8px;
+    text-shadow: 0 0 4px rgba(39, 174, 96, 0.3);
+  }
+  .vine-left { left: 8px; }
+  .vine-right { right: 8px; transform: scaleX(-1); }
+
+  /* --- Candle --- */
+  .candle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .candle-flame {
+    width: 6px;
+    height: 10px;
+    background: #F39C12;
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    box-shadow: 0 0 8px #F39C12, 0 0 16px rgba(243, 156, 18, 0.4);
+    animation: flicker 1.5s ease-in-out infinite alternate;
+  }
+  .candle-wax {
+    width: 10px;
+    height: 22px;
+    background: #F5E6CA;
+    border-radius: 2px;
+  }
+  .candle-holder {
+    width: 16px;
+    height: 4px;
+    background: #8B6914;
+    border-radius: 0 0 2px 2px;
+  }
+
+  @keyframes flicker {
+    0% { transform: scaleY(1) scaleX(1); opacity: 1; }
+    25% { transform: scaleY(1.1) scaleX(0.9); }
+    50% { transform: scaleY(0.9) scaleX(1.1); opacity: 0.85; }
+    75% { transform: scaleY(1.05) scaleX(0.95); }
+    100% { transform: scaleY(0.95) scaleX(1.05); opacity: 0.9; }
+  }
+
+  /* --- Crystal ball --- */
+  .crystal-ball {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .crystal-orb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, rgba(155, 89, 182, 0.3), #2C1A4A 70%);
+    border: 2px solid #7D3C98;
+    box-shadow: 0 0 10px rgba(155, 89, 182, 0.4), inset 0 0 8px rgba(155, 89, 182, 0.2);
+    animation: crystalGlow 3s ease-in-out infinite;
+  }
+  .crystal-base {
+    width: 18px;
+    height: 6px;
+    background: #8B6914;
+    border-radius: 0 0 4px 4px;
+    margin-top: -2px;
+  }
+
+  @keyframes crystalGlow {
+    0%, 100% { box-shadow: 0 0 10px rgba(155, 89, 182, 0.4), inset 0 0 8px rgba(155, 89, 182, 0.2); }
+    50% { box-shadow: 0 0 16px rgba(155, 89, 182, 0.7), inset 0 0 12px rgba(155, 89, 182, 0.4); }
+  }
+
+  /* --- Skull decoration --- */
+  .skull {
+    font-size: 20px;
+    filter: grayscale(0.3);
+  }
+
+  /* --- Plant --- */
+  .plant {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .plant-leaves {
+    font-size: 18px;
+    line-height: 1;
+    margin-bottom: -4px;
+  }
+  .plant-pot {
+    width: 16px;
+    height: 12px;
+    background: #A0522D;
+    border-radius: 0 0 4px 4px;
+    border-top: 2px solid #8B4513;
+  }
+
+  /* ===== Bottom HUD Strip =====
+     Retro game stats panel with live info. */
+  #bottom-hud {
+    width: 100%;
+    max-width: 1584px;
+    height: 83px;
+    background: linear-gradient(to bottom, #1a1412, #0f0d0b);
+    border-top: 2px solid #3d2e1f;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    font-family: 'VT323', monospace;
+    color: #c8b89a;
+    position: relative;
+  }
+
+  /* HUD decorative top edge */
+  #bottom-hud::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg,
+      transparent 0%, #6B4F10 10%, #A67C1A 30%,
+      #A67C1A 70%, #6B4F10 90%, transparent 100%
+    );
+  }
+
+  /* HUD section containers */
+  .hud-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .hud-label {
+    font-size: 14px;
+    color: #6b5d4d;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  .hud-value {
+    font-size: 28px;
+    color: #e8d8c0;
+    text-shadow: 0 0 6px rgba(232, 216, 192, 0.3);
+  }
+
+  .hud-value-small {
+    font-size: 20px;
+    color: #c8b89a;
+  }
+
+  /* Mood emoji display */
+  .hud-mood {
+    font-size: 36px;
+    line-height: 1;
+    filter: drop-shadow(0 0 4px rgba(155, 89, 182, 0.4));
+  }
+
+  /* Room name with accent color */
+  .hud-room {
+    font-size: 24px;
+    color: #A78BFA;
+    text-shadow: 0 0 8px rgba(167, 139, 250, 0.3);
+  }
+
+  /* Weather section */
+  .hud-weather {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .hud-weather-icon {
+    font-size: 28px;
+  }
+  .hud-weather-temp {
+    font-size: 24px;
+    color: #e8d8c0;
+  }
+
+  /* Divider lines between HUD sections */
+  .hud-divider {
+    width: 1px;
+    height: 50px;
+    background: linear-gradient(to bottom, transparent, #3d2e1f, transparent);
+  }
+
   /* ===== Room Container =====
      Maintains native wallpaper aspect ratio (1584×672 → 42.42%).
-     Fills width, centered vertically. */
+     Fills width, centered vertically. Now flanked by borders. */
   #room-container {
     position: relative;
     width: 100%;
     max-width: 1584px;
-    padding-top: 42.42%;
+    flex: 1;
+    min-height: 0;
   }
   #room-wallpaper {
     position: absolute;
@@ -62,9 +376,6 @@
     align-items: center;
     transition: left 0.6s ease, top 0.6s ease;
   }
-
-  /* ===== Cute 8-bit Font ===== */
-  @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
   /* ===== Speech Bubble (Stardew/Animal Crossing style) ===== */
   #speech-bubble {
@@ -146,10 +457,9 @@
   .mood-sleeping #sprite-wrap   { animation: none; filter: none; opacity: 0.6; }
 
   /* ===== Editor Toggle ===== */
-  #editor-btn {
+  .corner-btn {
     position: fixed;
-    bottom: 10px;
-    right: 10px;
+    bottom: 95px;
     width: 36px;
     height: 36px;
     background: rgba(30, 30, 30, 0.7);
@@ -166,12 +476,84 @@
     transition: opacity 0.3s;
     opacity: 0.4;
   }
-  #editor-btn:hover { opacity: 1; }
+  .corner-btn:hover { opacity: 1; }
+  #editor-btn { right: 10px; }
+  #fullscreen-btn { right: 54px; }
 </style>
 </head>
 <body>
 
-<!-- Room View -->
+<!-- ===== Top Decorative Border — Cozy Cottage Shelf ===== -->
+<div id="top-border">
+  <span class="vine vine-left">🌿</span>
+  <span class="vine vine-right">🌿</span>
+  <div class="shelf-items">
+    <!-- Left cluster: plant + books -->
+    <div class="shelf-item plant">
+      <div class="plant-leaves">🌱</div>
+      <div class="plant-pot"></div>
+    </div>
+    <div class="shelf-item books">
+      <div class="book book-tilted"></div>
+      <div class="book book-red"></div>
+      <div class="book book-blue"></div>
+      <div class="book book-green"></div>
+    </div>
+    <div class="shelf-item potion potion-green">
+      <div class="potion-cork"></div>
+      <div class="potion-neck"></div>
+      <div class="potion-body"></div>
+    </div>
+    <!-- Center cluster: candle + crystal ball -->
+    <div class="shelf-item candle">
+      <div class="candle-flame"></div>
+      <div class="candle-wax"></div>
+      <div class="candle-holder"></div>
+    </div>
+    <div class="shelf-item books">
+      <div class="book book-purple"></div>
+      <div class="book book-brown"></div>
+      <div class="book book-teal"></div>
+    </div>
+    <div class="shelf-item crystal-ball">
+      <div class="crystal-orb"></div>
+      <div class="crystal-base"></div>
+    </div>
+    <div class="shelf-item potion potion-purple">
+      <div class="potion-cork"></div>
+      <div class="potion-neck"></div>
+      <div class="potion-body"></div>
+    </div>
+    <!-- Right cluster: skull + books + potions -->
+    <div class="shelf-item skull">💀</div>
+    <div class="shelf-item books">
+      <div class="book book-red"></div>
+      <div class="book book-purple"></div>
+      <div class="book book-tilted"></div>
+    </div>
+    <div class="shelf-item potion potion-blue">
+      <div class="potion-cork"></div>
+      <div class="potion-neck"></div>
+      <div class="potion-body"></div>
+    </div>
+    <div class="shelf-item candle">
+      <div class="candle-flame"></div>
+      <div class="candle-wax"></div>
+      <div class="candle-holder"></div>
+    </div>
+    <div class="shelf-item potion potion-red">
+      <div class="potion-cork"></div>
+      <div class="potion-neck"></div>
+      <div class="potion-body"></div>
+    </div>
+    <div class="shelf-item plant">
+      <div class="plant-leaves">🪴</div>
+      <div class="plant-pot"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Room View ===== -->
 <div id="room-container">
   <img id="room-wallpaper" src="" alt="">
   <div id="speech-bubble"></div>
@@ -183,8 +565,36 @@
   </div>
 </div>
 
-<!-- Editor Link -->
-<a id="editor-btn" href="/editor.html" title="Open Editor">⚙️</a>
+<!-- ===== Bottom HUD — Retro Game Stats Panel ===== -->
+<div id="bottom-hud">
+  <div class="hud-section">
+    <div class="hud-label">Time</div>
+    <div class="hud-value" id="hud-time">--:--</div>
+    <div class="hud-value-small" id="hud-date">---</div>
+  </div>
+  <div class="hud-divider"></div>
+  <div class="hud-section">
+    <div class="hud-label">Weather</div>
+    <div class="hud-weather">
+      <span class="hud-weather-icon" id="hud-weather-icon">🌤️</span>
+      <span class="hud-weather-temp" id="hud-weather-temp">--°</span>
+    </div>
+  </div>
+  <div class="hud-divider"></div>
+  <div class="hud-section">
+    <div class="hud-label">Mood</div>
+    <div class="hud-mood" id="hud-mood">😴</div>
+  </div>
+  <div class="hud-divider"></div>
+  <div class="hud-section">
+    <div class="hud-label">Room</div>
+    <div class="hud-room" id="hud-room">---</div>
+  </div>
+</div>
+
+<!-- Controls -->
+<button id="fullscreen-btn" class="corner-btn" title="Toggle Fullscreen">⛶</button>
+<a id="editor-btn" class="corner-btn" href="/editor.html" title="Open Editor">⚙️</a>
 
 <script src="/js/claudron-face.js"></script>
 <script>
@@ -314,6 +724,9 @@
         currentStatus = state.status;
         updateBubble(currentStatus);
       }
+
+      // Update HUD with current mood and room
+      updateHud(state.mood, state.room);
     } catch {
       // Silent fail — retry next poll
     }
@@ -333,10 +746,124 @@
   });
 
   // =========================================================================
+  //  Fullscreen Toggle
+  // =========================================================================
+  const fsBtn = document.getElementById('fullscreen-btn');
+  fsBtn.addEventListener('click', () => {
+    const el = document.documentElement;
+    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+    if (!isFullscreen) {
+      (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen).call(el).catch(e => console.error('Fullscreen error:', e));
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen).call(document).catch(e => console.error('Exit fullscreen error:', e));
+    }
+  });
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(evt =>
+  document.addEventListener(evt, () => {
+    const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+    fsBtn.textContent = isFs ? '⛶' : '⛶';
+    // Hide controls in fullscreen after a delay, show on mouse move
+    if (isFs) {
+      fsBtn.style.opacity = '0';
+      document.getElementById('editor-btn').style.opacity = '0';
+      document.body.classList.add('cursor-hidden');
+    } else {
+      fsBtn.style.opacity = '';
+      document.getElementById('editor-btn').style.opacity = '';
+      document.body.classList.remove('cursor-hidden');
+    }
+    // Reposition sprite after fullscreen transition settles
+    setTimeout(() => {
+      if (currentLoc && roomConfig?.locations?.[currentLoc]) {
+        positionSprite(roomConfig.locations[currentLoc]);
+      }
+    }, 300);
+  }));
+  // Show controls on mouse move in fullscreen
+  let hideTimer;
+  document.addEventListener('mousemove', () => {
+    const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+    if (isFs) {
+      document.body.classList.remove('cursor-hidden');
+      fsBtn.style.opacity = '0.4';
+      document.getElementById('editor-btn').style.opacity = '0.4';
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        const stillFs = document.fullscreenElement || document.webkitFullscreenElement;
+        if (stillFs) {
+          fsBtn.style.opacity = '0';
+          document.getElementById('editor-btn').style.opacity = '0';
+          document.body.classList.add('cursor-hidden');
+        }
+      }, 2000);
+    }
+  });
+
+  // =========================================================================
+  //  HUD — Bottom Info Strip
+  // =========================================================================
+
+  const MOOD_EMOJI = {
+    happy: '😊', thinking: '🤔', sleeping: '😴', angry: '😠',
+    excited: '🤩', sad: '😢', focused: '🎯', coding: '💻'
+  };
+
+  const hudTime = document.getElementById('hud-time');
+  const hudDate = document.getElementById('hud-date');
+  const hudMood = document.getElementById('hud-mood');
+  const hudRoom = document.getElementById('hud-room');
+
+  /** Update the HUD clock every second. */
+  function updateClock() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    hudTime.textContent = `${h12}:${m} ${ampm}`;
+
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    hudDate.textContent = `${days[now.getDay()]} ${months[now.getMonth()]} ${now.getDate()}`;
+  }
+
+  /** Update HUD mood and room from state data. */
+  function updateHud(mood, room) {
+    hudMood.textContent = MOOD_EMOJI[mood] || '🔮';
+    hudRoom.textContent = room || '---';
+  }
+
+  // Start clock
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // =========================================================================
+  //  Weather Polling — every 15 minutes
+  // =========================================================================
+
+  const hudWeatherIcon = document.getElementById('hud-weather-icon');
+  const hudWeatherTemp = document.getElementById('hud-weather-temp');
+
+  async function pollWeather() {
+    try {
+      const res = await fetch('/api/weather');
+      const data = await res.json();
+      if (data.temp_f !== null && data.temp_f !== undefined) {
+        hudWeatherIcon.textContent = data.icon || '🌡️';
+        hudWeatherTemp.textContent = `${data.temp_f}°`;
+      }
+    } catch {
+      // Keep showing previous value or "--°"
+    }
+  }
+
+  // =========================================================================
   //  Init
   // =========================================================================
   pollState();
   setInterval(pollState, 2000);
+  pollWeather();
+  setInterval(pollWeather, 15 * 60 * 1000);
 </script>
 </body>
 </html>

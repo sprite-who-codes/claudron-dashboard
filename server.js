@@ -156,6 +156,49 @@ function getStatus() {
 }
 
 // =========================================================================
+//  Weather Helper (Open-Meteo — no API key needed)
+// =========================================================================
+
+/** Cached weather data to avoid hammering the API. */
+let weatherCache = { data: null, fetchedAt: 0 };
+
+/** Weather code → emoji mapping (WMO codes). */
+const WEATHER_EMOJI = {
+  0: '☀️',   1: '🌤️',  2: '⛅',   3: '☁️',
+  45: '🌫️', 48: '🌫️',
+  51: '🌦️', 53: '🌧️', 55: '🌧️',
+  61: '🌧️', 63: '🌧️', 65: '🌧️',
+  71: '🌨️', 73: '🌨️', 75: '🌨️',
+  80: '🌦️', 81: '🌧️', 82: '🌧️',
+  95: '⛈️',  96: '⛈️',  99: '⛈️'
+};
+
+/**
+ * Fetch current weather for Menlo Park, CA from Open-Meteo.
+ * Caches for 15 minutes.
+ * @returns {Promise<object>} { temp_f, icon }
+ */
+async function getWeather() {
+  const now = Date.now();
+  if (weatherCache.data && (now - weatherCache.fetchedAt) < 15 * 60 * 1000) {
+    return weatherCache.data;
+  }
+  try {
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=37.4529&longitude=-122.1817&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=America/Los_Angeles';
+    const resp = await fetch(url);
+    const json = await resp.json();
+    const temp_f = Math.round(json.current.temperature_2m);
+    const code = json.current.weather_code;
+    const icon = WEATHER_EMOJI[code] || '🌡️';
+    weatherCache.data = { temp_f, icon, code };
+    weatherCache.fetchedAt = now;
+    return weatherCache.data;
+  } catch (e) {
+    return weatherCache.data || { temp_f: null, icon: '🌡️', code: -1 };
+  }
+}
+
+// =========================================================================
 //  Request Body Helper
 // =========================================================================
 
@@ -224,6 +267,19 @@ const server = http.createServer(async (req, res) => {
     } catch {
       res.writeHead(500);
       res.end(JSON.stringify({ error: 'Failed to read state.json' }));
+    }
+    return;
+  }
+
+  // --- Route: GET /api/weather ---
+  if (req.url === '/api/weather' && req.method === 'GET') {
+    try {
+      const weather = await getWeather();
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+      res.end(JSON.stringify(weather));
+    } catch {
+      res.writeHead(500);
+      res.end(JSON.stringify({ temp_f: null, icon: '🌡️' }));
     }
     return;
   }
