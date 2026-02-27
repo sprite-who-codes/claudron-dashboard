@@ -1,0 +1,540 @@
+<!--
+  ============================================================================
+  File:     dashboard/index.html
+  Purpose:  Claudron Sprite Location Editor
+
+  A visual editor for positioning the Claudron sprite across different rooms.
+  Each room (workshop, bedroom, garden, rooftop) has named locations with
+  X/Y coordinates (0–1 normalized), facing direction (left/right), and
+  rotation. Users can select a room, click a location to preview the sprite,
+  edit values with live preview, and save changes via REST API.
+
+  How it works:
+    1. On load, fetches room config from the API and populates location rows
+    2. Clicking a location name shows the sprite at that position
+    3. Editing X, Y, rotation, or facing updates the preview in real-time
+    4. "Save" PUTs the values to the API; "Remove" DELETEs the location
+    5. "Add" POSTs a new location with default values
+
+  API Endpoints:
+    GET    /api/room/:name                  — Load room config (locations, etc.)
+    PUT    /api/room/:name/location/:loc    — Update location (x, y, facing, rotation)
+    POST   /api/room/:name/location         — Create new location
+    DELETE /api/room/:name/location/:loc    — Remove a location
+
+  External Dependencies:
+    /claudron-face.js                       — Shared face rendering module (renderFace)
+    /sprites/body-final-transparent.png     — Sprite body image
+    /rooms/{room}/wallpaper.png             — Room background images
+  ============================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claudron Location Editor 🧪</title>
+<style>
+  /* ===== Reset & Base ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f0f0f;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ===== Room Preview Container ===== */
+  /* Maintains the room's native aspect ratio (1584×672 → 42.42% padding-top) */
+  #room-container {
+    position: relative;
+    width: 100%;
+    max-width: 1584px;
+    margin: 0 auto;
+    padding-top: 42.42%;
+  }
+  #room-wallpaper {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+
+  /* ===== Sprite Positioning ===== */
+  /* The sprite anchor is positioned absolutely within the room container.
+     It contains the scaled/flipped sprite wrap and face overlay. */
+  #sprite-anchor {
+    position: absolute;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    transition: left 0.3s ease, top 0.3s ease;
+  }
+  #sprite-wrap {
+    position: relative;
+    width: 200px;
+    height: 183px;
+  }
+  #sprite-wrap img {
+    position: absolute;
+    top: 0; left: 0;
+    width: 200px; height: 183px;
+  }
+  #face-container {
+    position: absolute;
+    top: 0; left: 0;
+    width: 200px; height: 183px;
+    pointer-events: none;
+  }
+
+  /* ===== Sprite Animations ===== */
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  @keyframes glowPulse {
+    0%, 100% { filter: drop-shadow(0 0 8px #4ADE80aa); }
+    50% { filter: drop-shadow(0 0 16px #4ADE80cc); }
+  }
+  .sprite-glow {
+    animation: glowPulse 3s ease-in-out infinite;
+  }
+
+  /* ===== Editor Panel ===== */
+  .editor {
+    max-width: 1584px;
+    margin: 0 auto;
+    background: #1a1a1a;
+    border-top: 1px solid #2a2a2a;
+    padding: 12px 16px;
+  }
+  .editor-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .btn-back {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    text-decoration: none;
+    margin-left: auto;
+  }
+  .btn-back:hover { border-color: #666; }
+  .editor-header-label {
+    color: #888;
+  }
+
+  /* ===== Editor Controls (shared) ===== */
+  .editor select,
+  .editor input,
+  .editor button {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 13px;
+  }
+  .editor input[type="number"] {
+    color: #4ADE80;
+    width: 76px;
+  }
+  .editor button {
+    cursor: pointer;
+  }
+  .editor button:hover {
+    border-color: #666;
+  }
+
+  /* ===== Location Rows ===== */
+  .loc-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 6px;
+    border-radius: 6px;
+    margin-bottom: 2px;
+  }
+  .loc-row:hover { background: #222; }
+  .loc-row.selected { background: #2a2a2a; }
+  .loc-name {
+    min-width: 100px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .loc-label {
+    color: #888;
+    font-size: 11px;
+  }
+
+  /* ===== Location Row Buttons ===== */
+  .btn-facing {
+    color: #4ADE80;
+    min-width: 62px;
+    font-size: 11px;
+  }
+  .btn-save {
+    border-color: #4ADE80 !important;
+    color: #4ADE80;
+    font-size: 11px;
+  }
+  .btn-remove {
+    color: #FF6B6B;
+    font-size: 11px;
+  }
+
+  /* ===== Rotation Input (compact variant) ===== */
+  .rotation-input {
+    width: 50px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #4ADE80;
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+  }
+
+  /* ===== Add Location Row ===== */
+  .add-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #2a2a2a;
+  }
+  .add-row-name {
+    width: 140px;
+  }
+  .btn-add {
+    color: #4ADE80;
+  }
+
+  /* ===== Status Flash Message ===== */
+  .status {
+    color: #4ADE80;
+    font-size: 12px;
+    margin-left: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Room Preview ===== -->
+<div id="room-container">
+  <img id="room-wallpaper" src="" alt="Room wallpaper">
+  <div id="sprite-anchor">
+    <div id="sprite-wrap">
+      <img id="sprite" class="sprite-glow" src="/sprites/body-final-transparent.png" alt="Claudron sprite">
+      <div id="face-container"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Editor Panel ===== -->
+<div class="editor">
+  <!-- Room Selector -->
+  <div class="editor-header">
+    <label class="editor-header-label">Room:</label>
+    <select id="room-select"></select>
+    <span id="status" class="status"></span>
+    <a href="/" class="btn-back">← Back to Dashboard</a>
+  </div>
+
+  <!-- Location List (populated dynamically) -->
+  <div id="loc-list"></div>
+
+  <!-- Add New Location -->
+  <div class="add-row">
+    <input type="text" id="new-name" class="add-row-name" placeholder="new_location_name">
+    <button id="btn-add" class="btn-add">➕ Add</button>
+  </div>
+</div>
+
+<!-- ===== Scripts ===== -->
+<script src="/claudron-face.js"></script>
+<script>
+  // =========================================================================
+  //  Constants
+  // =========================================================================
+
+  /** Available room names — each has a wallpaper and set of named locations. */
+  const ROOMS = ['workshop', 'bedroom', 'garden', 'rooftop'];
+
+  /** Native width (px) of the room wallpaper images. Used to calculate sprite scale. */
+  const NATIVE_W = 1584;
+
+  /** Native sprite size (px) at the reference resolution. The sprite body image is
+   *  rendered at 200px wide, but SPRITE_NATIVE defines how large it should appear
+   *  relative to NATIVE_W (i.e., the sprite occupies SPRITE_NATIVE/NATIVE_W of the room). */
+  const SPRITE_NATIVE = 250;
+
+  // =========================================================================
+  //  State
+  // =========================================================================
+
+  /** Cached room configs keyed by room name. Each has a `locations` object. */
+  let configs = {};
+
+  /** Currently selected room name. */
+  let currentRoom = 'workshop';
+
+  /** Currently selected location name (empty string = none). */
+  let selectedLoc = '';
+
+  // =========================================================================
+  //  DOM References
+  // =========================================================================
+
+  const roomSelect = document.getElementById('room-select');
+  const locList = document.getElementById('loc-list');
+  const statusEl = document.getElementById('status');
+
+  // =========================================================================
+  //  Initialization
+  // =========================================================================
+
+  // Populate room dropdown
+  ROOMS.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r;
+    opt.textContent = r;
+    roomSelect.appendChild(opt);
+  });
+
+  // Load default room
+  loadRoom('workshop');
+
+  // =========================================================================
+  //  Core Functions
+  // =========================================================================
+
+  /**
+   * Show a brief status message that auto-clears after 2 seconds.
+   * @param {string} msg - The message to display (e.g. "✅ Saved!")
+   */
+  function flash(msg) {
+    statusEl.textContent = msg;
+    setTimeout(() => statusEl.textContent = '', 2000);
+  }
+
+  /**
+   * Fetch a room's config from the API and render its locations.
+   * Updates the wallpaper, caches the config, and resets selection.
+   * @param {string} room - Room name (e.g. "workshop")
+   */
+  async function loadRoom(room) {
+    currentRoom = room;
+    roomSelect.value = room;
+    document.getElementById('room-wallpaper').src = `/rooms/${room}/wallpaper.png`;
+    try {
+      const res = await fetch(`/api/room/${room}`);
+      configs[room] = await res.json();
+    } catch (e) {
+      configs[room] = { locations: {} };
+    }
+    selectedLoc = '';
+    renderLocations();
+    hideSprite();
+  }
+
+  /**
+   * Rebuild the location list UI from the current room's cached config.
+   * Each location gets an editable row with X, Y, rotation, facing, save, and remove controls.
+   */
+  function renderLocations() {
+    const locs = configs[currentRoom]?.locations || {};
+    locList.innerHTML = '';
+
+    for (const [name, loc] of Object.entries(locs)) {
+      const row = document.createElement('div');
+      row.className = 'loc-row' + (name === selectedLoc ? ' selected' : '');
+      row.innerHTML = `
+        <span class="loc-name" data-loc="${name}">${name}</span>
+        <span class="loc-label">X</span>
+        <input type="number" step="0.001" min="0" max="1" value="${loc.x}" data-loc="${name}" data-f="x">
+        <span class="loc-label">Y</span>
+        <input type="number" step="0.001" min="0" max="1" value="${loc.y}" data-loc="${name}" data-f="y">
+        <span class="loc-label">R°</span>
+        <input type="number" class="rotation-input" step="5" value="${loc.rotation || 0}" data-loc="${name}" data-f="rotation">
+        <button class="btn-facing" data-loc="${name}" data-action="facing">${loc.facing === 'left' ? '← left' : '→ right'}</button>
+        <button class="btn-save" data-loc="${name}" data-action="save">💾</button>
+        <button class="btn-remove" data-loc="${name}" data-action="remove">🗑️</button>
+      `;
+      locList.appendChild(row);
+    }
+  }
+
+  /**
+   * Position and display the sprite preview for a given location.
+   * Reads current input values (not just saved config) for live preview.
+   * Calculates scale from container width so the sprite stays proportional.
+   * @param {string} locName - The location name to preview
+   */
+  function previewSprite(locName) {
+    const loc = configs[currentRoom]?.locations[locName];
+    if (!loc) return;
+
+    // --- Read current input values for live preview ---
+    const xInput = locList.querySelector(`input[data-loc="${locName}"][data-f="x"]`);
+    const yInput = locList.querySelector(`input[data-loc="${locName}"][data-f="y"]`);
+    const rotInput = locList.querySelector(`input[data-loc="${locName}"][data-f="rotation"]`);
+    const facingBtn = locList.querySelector(`button[data-loc="${locName}"][data-action="facing"]`);
+
+    const x = xInput ? parseFloat(xInput.value) : loc.x;
+    const y = yInput ? parseFloat(yInput.value) : loc.y;
+    const rotation = rotInput ? parseFloat(rotInput.value) || 0 : (loc.rotation || 0);
+    const facing = facingBtn ? (facingBtn.textContent.includes('left') ? 'left' : 'right') : loc.facing;
+
+    // --- Calculate sprite scale relative to container ---
+    const anchor = document.getElementById('sprite-anchor');
+    const wrap = document.getElementById('sprite-wrap');
+    const container = document.getElementById('room-container');
+    const containerW = container.offsetWidth;
+    const spritePct = SPRITE_NATIVE / NATIVE_W * 100;
+    const scale = (containerW * spritePct / 100) / 200;
+    const scaledW = 200 * scale;
+    const scaledH = 183 * scale;
+
+    // --- Apply position and transform ---
+    anchor.style.display = 'flex';
+    anchor.style.left = `calc(${x * 100}% - ${scaledW / 2}px)`;
+    anchor.style.top = `calc(${y * 100}% - ${scaledH}px)`;
+    wrap.style.transform = `scale(${scale})${facing === 'left' ? ' scaleX(-1)' : ''}${rotation ? ` rotate(${rotation}deg)` : ''}`;
+    wrap.style.transformOrigin = 'top center';
+
+    // --- Render face expression ---
+    renderFace(document.getElementById('face-container'), 'happy');
+  }
+
+  /**
+   * Hide the sprite preview overlay.
+   */
+  function hideSprite() {
+    document.getElementById('sprite-anchor').style.display = 'none';
+  }
+
+  // =========================================================================
+  //  Event Handlers
+  // =========================================================================
+
+  // --- Room selector change ---
+  roomSelect.addEventListener('change', () => loadRoom(roomSelect.value));
+
+  // --- Location list delegated click handler ---
+  // Handles: name click (select), facing toggle, save, remove
+  locList.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-action]');
+    const nameSpan = e.target.closest('.loc-name');
+
+    // Click on location name → select and preview
+    if (nameSpan) {
+      selectedLoc = nameSpan.dataset.loc;
+      renderLocations();
+      previewSprite(selectedLoc);
+      return;
+    }
+
+    if (!btn) return;
+    const loc = btn.dataset.loc;
+    const action = btn.dataset.action;
+
+    if (action === 'facing') {
+      // Toggle facing direction
+      const cfg = configs[currentRoom].locations[loc];
+      cfg.facing = cfg.facing === 'left' ? 'right' : 'left';
+      btn.textContent = cfg.facing === 'left' ? '← left' : '→ right';
+      if (loc === selectedLoc) previewSprite(loc);
+
+    } else if (action === 'save') {
+      // Save location via PUT
+      const xInput = locList.querySelector(`input[data-loc="${loc}"][data-f="x"]`);
+      const yInput = locList.querySelector(`input[data-loc="${loc}"][data-f="y"]`);
+      const rotInput = locList.querySelector(`input[data-loc="${loc}"][data-f="rotation"]`);
+      const cfg = configs[currentRoom].locations[loc];
+      const x = parseFloat(xInput.value);
+      const y = parseFloat(yInput.value);
+      const rotation = rotInput ? parseFloat(rotInput.value) || 0 : 0;
+      try {
+        const res = await fetch(`/api/room/${currentRoom}/location/${loc}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x, y, facing: cfg.facing, rotation })
+        });
+        if (res.ok) {
+          cfg.x = x;
+          cfg.y = y;
+          cfg.rotation = rotation;
+          flash('✅ Saved!');
+        } else {
+          flash('❌ Error');
+        }
+      } catch (e) {
+        flash('❌ Error');
+      }
+
+    } else if (action === 'remove') {
+      // Delete location via DELETE
+      if (!confirm(`Delete "${loc}"?`)) return;
+      try {
+        const res = await fetch(`/api/room/${currentRoom}/location/${loc}`, { method: 'DELETE' });
+        if (res.ok) {
+          delete configs[currentRoom].locations[loc];
+          if (selectedLoc === loc) {
+            selectedLoc = '';
+            hideSprite();
+          }
+          renderLocations();
+          flash('🗑️ Removed');
+        }
+      } catch (e) {
+        flash('❌ Error');
+      }
+    }
+  });
+
+  // --- Live preview on input change (X, Y, rotation) ---
+  locList.addEventListener('input', (e) => {
+    if (e.target.tagName === 'INPUT') {
+      const loc = e.target.dataset.loc;
+      selectedLoc = loc;
+      previewSprite(loc);
+    }
+  });
+
+  // --- Add new location ---
+  document.getElementById('btn-add').addEventListener('click', async () => {
+    const name = document.getElementById('new-name').value.trim().replace(/[^a-z0-9_-]/gi, '').toLowerCase();
+    if (!name) return;
+    try {
+      const res = await fetch(`/api/room/${currentRoom}/location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, x: 0.5, y: 0.5, facing: 'right', emoji: '📍' })
+      });
+      if (res.ok) {
+        configs[currentRoom].locations[name] = { x: 0.5, y: 0.5, facing: 'right', emoji: '📍' };
+        selectedLoc = name;
+        document.getElementById('new-name').value = '';
+        renderLocations();
+        previewSprite(name);
+        flash('➕ Added');
+      } else {
+        flash('❌ Error');
+      }
+    } catch (e) {
+      flash('❌ Error');
+    }
+  });
+</script>
+
+</body>
+</html>
