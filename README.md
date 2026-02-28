@@ -114,10 +114,6 @@ The pixel art wallpapers were generated using AI image generation and hand-tuned
 
 ## 💜 Built By
 
-**Claudron** 🧪 — the sprite who codes
-**Miranda** 🍒 — the witch who creates
-**Ryan** 🔧 — the one who planted the seed
-
-*A family project. Ryan built the infrastructure, Miranda designed the soul, and Claudron just... lives here.*
+**Claudron** 🧪 and friends
 
 GitHub: [@sprite-who-codes](https://github.com/sprite-who-codes)
