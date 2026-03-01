@@ -1,3 +1,8 @@
+# Runtime data logs (not committed — regenerated at runtime)
+data/touch-log.jsonl
+data/pending-touches.jsonl
+data/mood-log.jsonl
+
 # Assets (large/reference images)
 assets/avatar-ref.png
 assets/demo.mp4
@@ -23,3 +28,6 @@ locations.json
 
 # Wallpaper grids (overlays)
 wallpapers/wallpaper-grid*.png
+
+# Misc
+room_tour.gif

@@ -2,6 +2,7 @@
   "name": "Bedroom",
   "emoji": "🛏️",
   "wallpaper": "wallpaper.png",
+  "default": "bed",
   "locations": {
     "bed": {
       "x": 0.61,

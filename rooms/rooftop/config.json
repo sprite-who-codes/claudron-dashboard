@@ -2,6 +2,7 @@
   "name": "Rooftop",
   "emoji": "🔭",
   "wallpaper": "wallpaper.png",
+  "default": "stars",
   "locations": {
     "book": {
       "x": 0.33,

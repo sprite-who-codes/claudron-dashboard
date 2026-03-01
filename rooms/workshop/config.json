@@ -2,6 +2,7 @@
   "name": "Workshop",
   "emoji": "🧪",
   "wallpaper": "wallpaper.png",
+  "default": "cauldron",
   "locations": {
     "bookshelf": {
       "x": 0.207,

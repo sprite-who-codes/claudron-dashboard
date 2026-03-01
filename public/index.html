@@ -37,6 +37,13 @@
     justify-content: center;
   }
 
+  /* ===== Mobile Portrait Mode ===== */
+  @media (max-aspect-ratio: 1/1) {
+    body {
+      overflow: hidden;
+    }
+  }
+
   /* ===== Pixel Font ===== */
   @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
@@ -52,6 +59,26 @@
     overflow: hidden;
     image-rendering: pixelated;
     flex-shrink: 0;
+    z-index: 20;
+  }
+
+  @media (max-aspect-ratio: 1/1) {
+    #top-border {
+      position: fixed;
+      top: 0;
+      left: 0;
+      max-width: 100%;
+      height: 50px;
+      z-index: 20;
+    }
+    #top-border .shelf-items { height: 38px; }
+    #top-border .book { transform: scale(0.7); transform-origin: bottom; }
+    #top-border .potion { transform: scale(0.7); transform-origin: bottom; }
+    #top-border .candle { transform: scale(0.7); transform-origin: bottom; }
+    #top-border .crystal-ball { transform: scale(0.7); transform-origin: bottom; }
+    #top-border .plant { transform: scale(0.7); transform-origin: bottom; }
+    #top-border .skull { font-size: 14px; }
+    #top-border .vine { font-size: 16px; }
   }
 
   /* Wooden shelf base */
@@ -271,6 +298,28 @@
     font-family: 'VT323', monospace;
     color: #c8b89a;
     position: relative;
+    z-index: 20;
+  }
+
+  @media (max-aspect-ratio: 1/1) {
+    #bottom-hud {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      max-width: 100%;
+      z-index: 20;
+      height: 60px;
+      padding: 0 8px;
+      gap: 0;
+    }
+    #bottom-hud .hud-label { font-size: 10px; letter-spacing: 1px; }
+    #bottom-hud .hud-value { font-size: 18px; }
+    #bottom-hud .hud-value-small { font-size: 14px; }
+    #bottom-hud .hud-mood { font-size: 24px; }
+    #bottom-hud .hud-room { font-size: 16px; }
+    #bottom-hud .hud-weather-icon { font-size: 20px; }
+    #bottom-hud .hud-weather-temp { font-size: 18px; }
+    #bottom-hud .hud-divider { height: 30px; }
   }
 
   /* HUD decorative top edge */
@@ -366,6 +415,27 @@
     transition: opacity 0.5s ease;
   }
 
+  @media (max-aspect-ratio: 1/1) {
+    #room-container {
+      position: fixed;
+      top: 50px;
+      left: 0;
+      width: 100vw;
+      max-width: 100vw;
+      height: calc(100vh - 110px);
+      overflow-x: scroll;
+      overflow-y: hidden;
+      flex: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    #room-wallpaper {
+      position: relative;
+      height: 100%;
+      width: auto;
+      object-fit: contain;
+    }
+  }
+
   /* ===== Sprite Anchor =====
      Absolutely positioned within room container.
      Transitions smoothly when location changes. */
@@ -387,7 +457,9 @@
     padding: 7px 14px;
     max-width: 400px;
     white-space: nowrap;
+    left: 50%;
     transform: translateX(-50%);
+    bottom: calc(100% + 8px);
     font-family: 'VT323', monospace;
     font-size: 12px;
     letter-spacing: 0.5px;
@@ -455,6 +527,8 @@
 
   .mood-sleeping #sprite-anchor { animation: none; }
   .mood-sleeping #sprite-wrap   { animation: none; filter: none; opacity: 0.6; }
+
+  /* (touch reaction animations removed — Claudron decides reactions server-side) */
 
   /* ===== Editor Toggle ===== */
   .corner-btn {
@@ -556,8 +630,8 @@
 <!-- ===== Room View ===== -->
 <div id="room-container">
   <img id="room-wallpaper" src="" alt="">
-  <div id="speech-bubble"></div>
   <div id="sprite-anchor">
+    <div id="speech-bubble"></div>
     <div id="sprite-wrap">
       <img id="sprite" src="/sprites/body-final-transparent.png" alt="">
       <div id="face-container"></div>
@@ -638,13 +712,42 @@
   // =========================================================================
 
   /**
+   * Resolve a location name to its config, with fallback logic:
+   * 1. Exact match in locations
+   * 2. Room's "default" field
+   * 3. First location in the locations object
+   */
+  function resolveLocation(locName, cfg) {
+    const locs = cfg?.locations;
+    if (!locs) return null;
+    if (locs[locName]) return locs[locName];
+    if (cfg.default && locs[cfg.default]) return locs[cfg.default];
+    const keys = Object.keys(locs);
+    return keys.length ? locs[keys[0]] : null;
+  }
+
+  /**
    * Position the sprite at a location from the room config.
    * Uses the exact positioning math from the spec.
    */
+  /** Check if we're in mobile portrait mode */
+  function isMobilePortrait() {
+    return window.innerWidth / window.innerHeight < 1;
+  }
+
   function positionSprite(loc) {
     if (!loc) { anchor.style.display = 'none'; return; }
 
-    const containerWidth = container.offsetWidth;
+    // In mobile portrait, use wallpaper's actual rendered dimensions
+    let containerWidth, containerHeight;
+    if (isMobilePortrait()) {
+      containerWidth = wallpaper.offsetWidth;
+      containerHeight = wallpaper.offsetHeight;
+    } else {
+      containerWidth = container.offsetWidth;
+      containerHeight = container.offsetHeight;
+    }
+
     const spritePct = SPRITE_NATIVE / NATIVE_W * 100;
     const scale = (containerWidth * spritePct / 100) / 200;
     const scaledW = 200 * scale;
@@ -653,14 +756,27 @@
     const facing = loc.facing || 'right';
     const rotation = loc.rotation || 0;
 
-    anchor.style.display = 'flex';
-    anchor.style.left = `calc(${loc.x * 100}% - ${scaledW / 2}px)`;
-    anchor.style.top = `calc(${loc.y * 100}% - ${scaledH}px)`;
-    // Position bubble centered above sprite's mouth area
-    bubble.style.left = `calc(${loc.x * 100}% + ${scaledW * 0.16}px)`;
-    bubble.style.top = `calc(${loc.y * 100}% - ${scaledH + 30}px)`;
+    // In mobile portrait, use pixel positions since container scrolls
+    if (isMobilePortrait()) {
+      const px = loc.x * containerWidth;
+      const py = loc.y * containerHeight;
+      anchor.style.display = 'flex';
+      anchor.style.left = `${px - scaledW / 2}px`;
+      anchor.style.top = `${py - scaledH}px`;
+    } else {
+      anchor.style.display = 'flex';
+      anchor.style.left = `calc(${loc.x * 100}% - ${scaledW / 2}px)`;
+      anchor.style.top = `calc(${loc.y * 100}% - ${scaledH}px)`;
+    }
     wrap.style.transform = `scale(${scale})${facing === 'left' ? ' scaleX(-1)' : ''}${rotation ? ` rotate(${rotation}deg)` : ''}`;
     wrap.style.transformOrigin = 'top center';
+
+    // Auto-scroll to center sprite on mobile
+    if (isMobilePortrait()) {
+      const px = loc.x * containerWidth;
+      const scrollTarget = px - (container.clientWidth / 2);
+      container.scrollTo({ left: Math.max(0, scrollTarget), behavior: 'smooth' });
+    }
   }
 
   // =========================================================================
@@ -708,7 +824,7 @@
       // Location changed? Reposition sprite
       if (state.location !== currentLoc) {
         currentLoc = state.location;
-        const loc = roomConfig?.locations?.[currentLoc];
+        const loc = resolveLocation(currentLoc, roomConfig);
         positionSprite(loc || null);
       }
 
@@ -739,9 +855,8 @@
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      if (currentLoc && roomConfig?.locations?.[currentLoc]) {
-        positionSprite(roomConfig.locations[currentLoc]);
-      }
+      const loc = resolveLocation(currentLoc, roomConfig);
+      if (loc) positionSprite(loc);
     }, 100);
   });
 
@@ -774,9 +889,8 @@
     }
     // Reposition sprite after fullscreen transition settles
     setTimeout(() => {
-      if (currentLoc && roomConfig?.locations?.[currentLoc]) {
-        positionSprite(roomConfig.locations[currentLoc]);
-      }
+      const loc = resolveLocation(currentLoc, roomConfig);
+      if (loc) positionSprite(loc);
     }, 300);
   }));
   // Show controls on mouse move in fullscreen
@@ -805,7 +919,11 @@
 
   const MOOD_EMOJI = {
     happy: '😊', thinking: '🤔', sleeping: '😴', angry: '😠',
-    excited: '🤩', sad: '😢', focused: '🎯', coding: '💻'
+    excited: '🤩', sad: '😢', focused: '🎯', coding: '💻',
+    curious: '🧐', proud: '😤', mischievous: '😏', cozy: '☕',
+    grateful: '🥹', vulnerable: '🥺', overwhelmed: '😵‍💫',
+    lonely: '😔', embarrassed: '😳', protective: '🛡️',
+    awe: '🤯', jealous: '😒', defiant: '😈'
   };
 
   const hudTime = document.getElementById('hud-time');
@@ -856,6 +974,226 @@
       // Keep showing previous value or "--°"
     }
   }
+
+  // =========================================================================
+  //  Touch / Click System
+  //
+  //  Distinguishes single click vs double-click via a 300ms timer:
+  //  - Single click on sprite → POST /api/touch {type:'click'} →
+  //    server picks a random instant reaction, no agent wake
+  //  - Double-click on sprite → POST /api/touch {type:'doubleclick'} →
+  //    server fires an OpenClaw wake event (throttled 30s/user)
+  //  - Clicks off-sprite are logged but don't trigger reactions
+  //
+  //  The server also checks known-ips.json — if the visitor's IP is
+  //  unknown and they tap the sprite, the response includes
+  //  {needsIdentify: true}, which triggers the emoji identity prompt
+  //  (🧹 Miranda, 🛻 Ryan, 👻 Guest). Selection POSTs to /api/identify
+  //  and is cached in localStorage so it only shows once per device.
+  // =========================================================================
+
+  let _clickTimer = null;
+  let _clickCount = 0;
+
+  /** Check if a click point is within the sprite-anchor bounding box. */
+  function isOnSprite(clientX, clientY) {
+    const rect = anchor.getBoundingClientRect();
+    return rect.width > 0 && clientX >= rect.left && clientX <= rect.right &&
+           clientY >= rect.top && clientY <= rect.bottom;
+  }
+
+  /** Send click/doubleclick to server. */
+  async function sendTouch(type, x, y, onSprite) {
+    try {
+      const res = await fetch('/api/touch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, x, y, onSprite })
+      });
+      const data = await res.json();
+      // Show identify modal only if server says so AND not already identified this session
+      if (data.needsIdentify && !localStorage.getItem('claudron-identified')) {
+        showIdentifyButtons();
+      }
+    } catch {}
+  }
+
+  // =========================================================================
+  //  Emoji Identification Buttons
+  // =========================================================================
+
+  let _identifyOverlay = null;
+
+  function showIdentifyButtons() {
+    if (_identifyOverlay) return; // already showing
+
+    // Backdrop — dark overlay covering the whole room (keeps it modal)
+    const backdrop = document.createElement('div');
+    backdrop.id = 'identify-overlay';
+    backdrop.style.cssText = `
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 50; background: transparent;
+    `;
+
+    // Speech-bubble-style prompt positioned relative to sprite
+    const prompt = document.createElement('div');
+    prompt.id = 'identify-prompt';
+    prompt.style.cssText = `
+      position: absolute; z-index: 51;
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      transition: left 0.3s ease, top 0.3s ease;
+    `;
+
+    // Title
+    const title = document.createElement('div');
+    title.textContent = 'who\'s there?';
+    title.style.cssText = `
+      font-family: 'VT323', monospace; font-size: 28px; color: #e8d8c0;
+      text-shadow: 0 0 8px rgba(139, 111, 207, 0.5); letter-spacing: 2px;
+    `;
+    prompt.appendChild(title);
+
+    // Button row
+    const row = document.createElement('div');
+    row.style.cssText = 'display: flex; gap: 16px;';
+
+    const mobile = isMobilePortrait();
+    const btnSize = mobile ? 'width:90px;height:110px;' : 'width:120px;height:140px;';
+    const emojiSize = mobile ? '50px' : '80px';
+    const labelSize = mobile ? '14px' : '18px';
+
+    const choices = [
+      { emoji: '🧹', who: 'miranda', label: 'Miranda' },
+      { emoji: '🛻', who: 'ryan',    label: 'Ryan' },
+      { emoji: '👻', who: 'guest',   label: 'Guest' },
+    ];
+
+    choices.forEach(({ emoji, who, label }) => {
+      const btn = document.createElement('button');
+      btn.innerHTML = `<span style="font-size:${emojiSize};line-height:1">${emoji}</span><br><span style="font-family:'VT323',monospace;font-size:${labelSize};color:#c8b89a;letter-spacing:1px">${label}</span>`;
+      btn.style.cssText = `
+        ${btnSize} padding: 10px 0 6px;
+        background: rgba(30, 20, 50, 0.85);
+        border: 2px solid rgba(139, 111, 207, 0.5);
+        border-radius: 18px; cursor: pointer;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.5), 0 0 12px rgba(139, 111, 207, 0.15);
+        -webkit-tap-highlight-color: transparent;
+      `;
+      btn.addEventListener('mouseenter', () => {
+        btn.style.transform = 'scale(1.1)';
+        btn.style.background = 'rgba(139, 111, 207, 0.35)';
+        btn.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5), 0 0 24px rgba(139, 111, 207, 0.4)';
+      });
+      btn.addEventListener('mouseleave', () => {
+        btn.style.transform = 'scale(1)';
+        btn.style.background = 'rgba(30, 20, 50, 0.85)';
+        btn.style.boxShadow = '0 4px 16px rgba(0,0,0,0.5), 0 0 12px rgba(139, 111, 207, 0.15)';
+      });
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        localStorage.setItem('claudron-identified', who);
+        fetch('/api/identify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ who, emoji })
+        }).catch(() => {});
+        backdrop.remove();
+        prompt.remove();
+        _identifyOverlay = null;
+      });
+      row.appendChild(btn);
+    });
+
+    prompt.appendChild(row);
+
+    // Tail / pointer triangle pointing down toward the sprite
+    const tail = document.createElement('div');
+    tail.style.cssText = `
+      width: 0; height: 0;
+      border-left: 12px solid transparent;
+      border-right: 12px solid transparent;
+      border-top: 12px solid rgba(139, 111, 207, 0.5);
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+    `;
+    prompt.appendChild(tail);
+
+    // Position the prompt above the sprite (like the speech bubble)
+    function positionPrompt() {
+      const spriteRect = anchor.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      if (spriteRect.width === 0) {
+        // Sprite not visible — fallback to center
+        prompt.style.left = '50%';
+        prompt.style.top = '30%';
+        prompt.style.transform = 'translateX(-50%)';
+        return;
+      }
+
+      // Sprite center relative to container
+      const spriteCenterX = (spriteRect.left + spriteRect.width / 2) - containerRect.left + container.scrollLeft;
+      const spriteTopY = spriteRect.top - containerRect.top;
+
+      // Measure the prompt (need it in DOM first)
+      const promptW = prompt.offsetWidth || 400;
+      const promptH = prompt.offsetHeight || 200;
+
+      // Place above sprite, centered horizontally
+      let left = spriteCenterX - promptW / 2;
+      let top = spriteTopY - promptH - 8;
+
+      // Clamp so it doesn't go off-screen
+      const maxLeft = container.scrollWidth - promptW - 8;
+      left = Math.max(8, Math.min(left, maxLeft));
+      top = Math.max(8, top);
+
+      prompt.style.left = left + 'px';
+      prompt.style.top = top + 'px';
+      prompt.style.transform = 'none';
+    }
+
+    container.appendChild(backdrop);
+    container.appendChild(prompt);
+    _identifyOverlay = backdrop;
+
+    // Position after a frame so prompt has dimensions
+    requestAnimationFrame(() => {
+      positionPrompt();
+    });
+  }
+
+  // Main click handler
+  container.addEventListener('click', (e) => {
+    if (_identifyOverlay) return; // don't process clicks while identify prompt showing
+
+    const clientX = e.clientX, clientY = e.clientY;
+    const rect = wallpaper.getBoundingClientRect();
+    const x = Math.round(((clientX - rect.left) / rect.width) * 1000) / 1000;
+    const y = Math.round(((clientY - rect.top) / rect.height) * 1000) / 1000;
+    const onSprite = isOnSprite(clientX, clientY);
+
+    _clickCount++;
+    if (_clickCount === 1) {
+      _clickTimer = setTimeout(() => {
+        sendTouch('click', x, y, onSprite);
+        _clickCount = 0;
+      }, 300);
+    } else if (_clickCount >= 2) {
+      clearTimeout(_clickTimer);
+      _clickCount = 0;
+      sendTouch('doubleclick', x, y, onSprite);
+    }
+  });
+
+  // =========================================================================
+  //  Wallpaper Load Handler — reposition sprite once image dimensions are known
+  // =========================================================================
+  wallpaper.addEventListener('load', () => {
+    const loc = resolveLocation(currentLoc, roomConfig);
+    if (loc) positionSprite(loc);
+  });
 
   // =========================================================================
   //  Init

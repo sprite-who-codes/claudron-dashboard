@@ -2,6 +2,7 @@
   "name": "Garden",
   "emoji": "🌿",
   "wallpaper": "wallpaper.png",
+  "default": "fountain",
   "locations": {
     "fountain": {
       "x": 0.2,

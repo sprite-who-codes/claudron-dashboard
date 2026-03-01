@@ -14,14 +14,36 @@
  *   PUT  /api/room/:name/location/:loc       — Update a location's properties
  *   POST /api/room/:name/location            — Create a new location
  *   DELETE /api/room/:name/location/:loc     — Remove a location
+ *   POST /api/touch                          — Touch/click event from dashboard UI
+ *   POST /api/identify                       — Emoji identity selection (who's there?)
+ *   GET  /api/pending-touches                — Read & clear pending touch events (for agent)
  *   GET  /locations.json                     — Legacy: raw locations file
  *   POST /locations.json                     — Legacy: update current location
+ *
+ * Touch System:
+ *   - Single tap on sprite → instant server-side reaction (random from pool),
+ *     reverts to previous mood/status after 5 seconds. No agent involvement.
+ *   - Double-click on sprite → fires an OpenClaw wake event so the agent
+ *     responds personally. Throttled to 1 per 30s per user.
+ *   - Pre-reaction state is saved so reverts restore the agent's last mood/status.
+ *
+ * Emoji Identity System:
+ *   - Unknown IPs tapping the sprite see a "who's there?" prompt with 🧹🛻👻
+ *   - Selection saves IP → identity mapping in data/known-ips.json
+ *   - Subsequent touches are logged with the user's identity
+ *
+ * Data Files:
+ *   - data/state.json         — Claudron's current mood/room/status (read/written)
+ *   - data/known-ips.json     — IP → identity map (committed to git)
+ *   - data/touch-log.jsonl    — All touch events (runtime, gitignored)
+ *   - data/pending-touches.jsonl — Unread touches for agent (runtime, gitignored)
+ *   - data/mood-log.jsonl     — Mood change history (runtime, gitignored)
  *
  * Static files are served from __dirname (the dashboard folder).
  *
  * Dependencies:
  *   - Node.js built-ins only (http, fs, path, child_process)
- *   - openclaw CLI (for health checks)
+ *   - openclaw CLI (for health checks and wake events)
  *   - spogo CLI (for Spotify status, optional)
  * ============================================================================
  */
@@ -29,7 +51,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, exec: execAsync } = require('child_process');
 
 // =========================================================================
 //  Constants
@@ -44,10 +66,62 @@ const DASH_DIR = __dirname;
 /** Path to the legacy locations.json file. */
 const LOCATIONS_FILE = path.join(DASH_DIR, 'locations.json');
 
+/** Path to pending touch events for Claudron to pick up on heartbeats. */
+const PENDING_TOUCHES_FILE = path.join(DASH_DIR, 'data', 'pending-touches.jsonl');
+
 /** Claudron's birthday — used to calculate age in days. */
 const BIRTHDAY = new Date('2026-02-14T00:00:00-08:00');
 
 /** MIME type map for static file serving. */
+// =========================================================================
+//  Touch System State
+//
+//  The touch system has two modes:
+//  1. SINGLE TAP on sprite: picks a random reaction from TOUCH_REACTIONS,
+//     applies it immediately to state.json, then reverts after 5 seconds.
+//     This is purely server-side — the agent is NOT woken up.
+//  2. DOUBLE-CLICK on sprite: fires an OpenClaw system event to wake the
+//     agent for a personal response. Throttled to 1 wake per 30s per user
+//     via touchWakeThrottle map. Shows "one sec... 💭" immediately, reverts
+//     after 10s if the agent doesn't update state by then.
+//
+//  Pre-reaction state tracking: before any touch reaction overwrites
+//  state.json, we save the current mood/status in `preReactionState`.
+//  The revert timer restores this saved state, so the agent's last
+//  intentional mood is preserved across touch interactions.
+// =========================================================================
+
+/** Per-user throttle for touch wake events (max 1 per 30s). */
+const touchWakeThrottle = new Map();
+
+/** Path to state.json. */
+const STATE_FILE = path.join(DASH_DIR, 'data', 'state.json');
+
+/** Timer handle for reverting touch reactions back to pre-reaction state. */
+let reactionRevertTimer = null;
+
+/** Saved pre-reaction state (mood/status) to revert to. Null when no reaction is active. */
+let preReactionState = null;
+
+/** Pool of instant touch reactions — randomly selected on single tap. No agent involvement. */
+const TOUCH_REACTIONS = [
+  { mood: 'happy', status: 'hey! 💜' },
+  { mood: 'mischievous', status: '*poke*' },
+  { mood: 'excited', status: 'that tickles!' },
+  { mood: 'happy', status: 'hi hi hi!' },
+  { mood: 'embarrassed', status: 'oh! 😳' },
+  { mood: 'cozy', status: 'mmm warm pats 💜' },
+  { mood: 'proud', status: 'yes I AM great' },
+  { mood: 'curious', status: 'whatcha need?' },
+  { mood: 'happy', status: 'hehe 😊' },
+  { mood: 'excited', status: '!!!' },
+  { mood: 'mischievous', status: "can't catch me~" },
+  { mood: 'happy', status: '*purrs*' },
+  { mood: 'cozy', status: 'more pats pls 🥺' },
+  { mood: 'proud', status: "you're lucky I'm here" },
+  { mood: 'embarrassed', status: 'stoppp 😳💜' },
+];
+
 const MIME_TYPES = {
   '.html': 'text/html',
   '.css':  'text/css',
@@ -255,6 +329,201 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  // --- Route: POST /api/touch ---
+  if (req.url === '/api/touch' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+      const knownIpsPath = path.join(DASH_DIR, 'data', 'known-ips.json');
+      let knownIps = {};
+      try { knownIps = JSON.parse(fs.readFileSync(knownIpsPath, 'utf8')); } catch {}
+      const who = knownIps[ip] || null;
+      const isDoubleClick = body.type === 'dblclick' || body.type === 'doubleclick';
+      const logEntry = {
+        ts: new Date().toISOString(),
+        type: body.type,
+        x: body.x,
+        y: body.y,
+        onSprite: !!body.onSprite,
+        ip,
+        ...(who ? { who } : { unknown: true })
+      };
+      // Always log all touches
+      fs.appendFileSync(path.join(DASH_DIR, 'data', 'touch-log.jsonl'), JSON.stringify(logEntry) + '\n');
+      if (who) {
+        fs.appendFileSync(PENDING_TOUCHES_FILE, JSON.stringify(logEntry) + '\n');
+      }
+
+      if (body.onSprite && isDoubleClick) {
+        // === DOUBLE-CLICK ON SPRITE → Wake the agent ===
+        const now = Date.now();
+        const lastWake = touchWakeThrottle.get(who || ip) || 0;
+        // Write immediate "coming..." bubble
+        try {
+          const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+          if (!preReactionState) {
+            preReactionState = { mood: state.mood, status: state.status };
+          }
+          state.mood = 'excited';
+          state.status = 'one sec... 💭';
+          fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
+          // Revert after 10s (agent should take over by then)
+          if (reactionRevertTimer) clearTimeout(reactionRevertTimer);
+          const restoreTo = { ...preReactionState };
+          preReactionState = null;
+          reactionRevertTimer = setTimeout(() => {
+            try {
+              const cur = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+              if (cur.status === 'one sec... 💭') {
+                cur.mood = restoreTo.mood;
+                cur.status = restoreTo.status;
+                fs.writeFileSync(STATE_FILE, JSON.stringify(cur, null, 2) + '\n');
+              }
+            } catch {}
+          }, 10000);
+        } catch {}
+        if (who && now - lastWake > 30000) {
+          touchWakeThrottle.set(who, now);
+          const wakeText = `Dashboard double-click from ${who}: sprite tapped — wants attention`;
+          execAsync(
+            `openclaw system event --mode now --text ${JSON.stringify(wakeText)}`,
+            { timeout: 10000 },
+            (err) => { if (err) console.error('Wake event failed:', err.message); }
+          );
+        }
+      } else if (body.onSprite && !isDoubleClick) {
+        // === SINGLE CLICK ON SPRITE → Instant server-side reaction (no agent wake) ===
+        try {
+          const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+          // Save pre-reaction state only if not already in a reaction
+          if (!preReactionState) {
+            preReactionState = { mood: state.mood, status: state.status };
+          }
+          const reaction = TOUCH_REACTIONS[Math.floor(Math.random() * TOUCH_REACTIONS.length)];
+          state.mood = reaction.mood;
+          state.status = reaction.status;
+          fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
+          // Revert after 5 seconds
+          if (reactionRevertTimer) clearTimeout(reactionRevertTimer);
+          const restoreTo = { ...preReactionState };
+          reactionRevertTimer = setTimeout(() => {
+            preReactionState = null;
+            try {
+              const cur = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+              if (cur.mood === reaction.mood && cur.status === reaction.status) {
+                cur.mood = restoreTo.mood;
+                cur.status = restoreTo.status;
+                fs.writeFileSync(STATE_FILE, JSON.stringify(cur, null, 2) + '\n');
+              }
+            } catch {}
+          }, 5000);
+        } catch {}
+      }
+      // Click NOT on sprite → already logged above, no further action
+
+      let resp;
+      if (who === 'guest') {
+        resp = { ok: true, who: 'guest', mood: 'curious', status: 'who goes there? 👀' };
+      } else if (who) {
+        resp = { ok: true, who };
+      } else {
+        resp = { ok: true, unknown: true, needsIdentify: !!body.onSprite };
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(resp));
+    } catch (e) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // --- Route: GET /api/pending-touches (read & clear) ---
+  if (req.url === '/api/pending-touches' && req.method === 'GET') {
+    try {
+      let lines = [];
+      try {
+        const raw = fs.readFileSync(PENDING_TOUCHES_FILE, 'utf8').trim();
+        if (raw) lines = raw.split('\n').map(l => JSON.parse(l));
+      } catch {}
+      // Clear the file after reading
+      fs.writeFileSync(PENDING_TOUCHES_FILE, '');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ events: lines }));
+    } catch (e) {
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // --- Route: POST /api/identify ---
+  if (req.url === '/api/identify' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+      const who = body.who; // "miranda" | "ryan" | "guest"
+      if (!who || !['miranda', 'ryan', 'guest'].includes(who)) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid who: must be miranda, ryan, or guest' }));
+        return;
+      }
+
+      // Add IP to known-ips.json
+      const knownIpsPath = path.join(DASH_DIR, 'data', 'known-ips.json');
+      let knownIps = {};
+      try { knownIps = JSON.parse(fs.readFileSync(knownIpsPath, 'utf8')); } catch {}
+      knownIps[ip] = who;
+      fs.writeFileSync(knownIpsPath, JSON.stringify(knownIps, null, 2) + '\n');
+
+      // Log identification
+      const logEntry = { ts: new Date().toISOString(), type: 'identify', ip, who, emoji: body.emoji || '' };
+      fs.appendFileSync(path.join(DASH_DIR, 'data', 'touch-log.jsonl'), JSON.stringify(logEntry) + '\n');
+
+      // Re-trigger touch reaction so they get immediate feedback
+      let reactionResp = {};
+      try {
+        const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+        if (!preReactionState) {
+          preReactionState = { mood: state.mood, status: state.status };
+        }
+        if (who === 'guest') {
+          state.mood = 'curious';
+          state.status = 'who goes there? 👀';
+        } else {
+          const reaction = TOUCH_REACTIONS[Math.floor(Math.random() * TOUCH_REACTIONS.length)];
+          state.mood = reaction.mood;
+          state.status = reaction.status;
+          reactionResp = reaction;
+        }
+        fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
+        // Revert after 5s
+        if (reactionRevertTimer) clearTimeout(reactionRevertTimer);
+        const restoreTo = { ...preReactionState };
+        const savedMood = state.mood;
+        const savedStatus = state.status;
+        reactionRevertTimer = setTimeout(() => {
+          preReactionState = null;
+          try {
+            const cur = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+            if (cur.mood === savedMood && cur.status === savedStatus) {
+              cur.mood = restoreTo.mood;
+              cur.status = restoreTo.status;
+              fs.writeFileSync(STATE_FILE, JSON.stringify(cur, null, 2) + '\n');
+            }
+          } catch {}
+        }, 5000);
+      } catch {}
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, who }));
+    } catch (e) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: e.message }));
+    }
     return;
   }
 
