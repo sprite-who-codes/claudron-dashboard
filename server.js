@@ -97,6 +97,12 @@ const touchWakeThrottle = new Map();
 /** Path to state.json. */
 const STATE_FILE = path.join(DASH_DIR, 'data', 'state.json');
 
+/** Path to spatial analysis cache (agent overrides). */
+const SPATIAL_CACHE_FILE = path.join(DASH_DIR, 'data', 'spatial-cache.json');
+
+/** Path to pre-generated spatial map. */
+const SPATIAL_MAP_FILE = path.join(DASH_DIR, 'data', 'spatial-map.json');
+
 /** Timer handle for reverting touch reactions back to pre-reaction state. */
 let reactionRevertTimer = null;
 
@@ -422,7 +428,81 @@ const server = http.createServer(async (req, res) => {
           }, 5000);
         } catch {}
       }
-      // Click NOT on sprite → already logged above, no further action
+      // === DOUBLE-CLICK NOT ON SPRITE → Instant spatial lookup from pre-generated map ===
+      if (!body.onSprite && isDoubleClick && who && who !== 'guest') {
+        try {
+          const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+          const room = state.room || 'workshop';
+          const clickX = body.x || 0;
+          const clickY = body.y || 0;
+
+          // Check agent override cache first (grid-based keys still work)
+          let spatialCache = {};
+          try { spatialCache = JSON.parse(fs.readFileSync(SPATIAL_CACHE_FILE, 'utf8')); } catch {}
+          const cellX = Math.min(Math.floor(clickX * 10), 9);
+          const cellY = Math.min(Math.floor(clickY * 10), 9);
+          const cellKey = `${cellX}_${cellY}`;
+
+          let desc = null;
+
+          // Priority 1: agent override cache
+          if (spatialCache[room] && spatialCache[room][cellKey]) {
+            desc = spatialCache[room][cellKey];
+          } else {
+            // Priority 2: nearest object from spatial map
+            try {
+              const spatialMap = JSON.parse(fs.readFileSync(SPATIAL_MAP_FILE, 'utf8'));
+              const objects = spatialMap[room] || [];
+              let bestDist = Infinity;
+              let bestObj = null;
+              for (const obj of objects) {
+                const dx = obj.x - clickX;
+                const dy = obj.y - clickY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < bestDist) {
+                  bestDist = dist;
+                  bestObj = obj;
+                }
+              }
+              if (bestObj && bestDist < 0.15) {
+                desc = bestObj.description;
+              } else {
+                desc = 'just empty floor here... nothing interesting 🤷';
+              }
+            } catch {
+              desc = 'hmm, I can\'t quite see from here... 👀';
+            }
+          }
+
+          // Show description in speech bubble
+          if (!preReactionState) {
+            preReactionState = { mood: state.mood, status: state.status };
+          }
+          state.status = desc;
+          fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
+
+          // Revert after 8s
+          if (reactionRevertTimer) clearTimeout(reactionRevertTimer);
+          const restoreTo = { ...preReactionState };
+          preReactionState = null;
+          reactionRevertTimer = setTimeout(() => {
+            try {
+              const cur = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+              if (cur.status === desc) {
+                cur.mood = restoreTo.mood;
+                cur.status = restoreTo.status;
+                fs.writeFileSync(STATE_FILE, JSON.stringify(cur, null, 2) + '\n');
+              }
+            } catch {}
+          }, 8000);
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, spatial: true, description: desc }));
+          return;
+        } catch (e) {
+          console.error('Spatial lookup error:', e.message);
+        }
+      }
 
       let resp;
       if (who === 'guest') {
@@ -520,6 +600,39 @@ const server = http.createServer(async (req, res) => {
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, who }));
+    } catch (e) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // --- Route: POST /api/spatial-cache (agent writes back analysis results) ---
+  if (req.url === '/api/spatial-cache' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const { room, cell, description } = body;
+      if (!room || !cell || !description) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'room, cell, and description required' }));
+        return;
+      }
+      // Update spatial cache
+      let cache = {};
+      try { cache = JSON.parse(fs.readFileSync(SPATIAL_CACHE_FILE, 'utf8')); } catch {}
+      if (!cache[room]) cache[room] = {};
+      cache[room][cell] = description;
+      fs.writeFileSync(SPATIAL_CACHE_FILE, JSON.stringify(cache, null, 2) + '\n');
+
+      // Also update state.json with the description
+      try {
+        const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+        state.status = description;
+        fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
+      } catch {}
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, room, cell, cached: true }));
     } catch (e) {
       res.writeHead(400);
       res.end(JSON.stringify({ error: e.message }));
