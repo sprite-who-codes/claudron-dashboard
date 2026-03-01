@@ -474,9 +474,28 @@ const server = http.createServer(async (req, res) => {
             }
           }
 
+          // Move sprite to nearest location in the room
+          try {
+            const roomConfig = JSON.parse(fs.readFileSync(
+              path.join(DASH_DIR, 'rooms', room, 'config.json'), 'utf8'));
+            const locs = roomConfig.locations || {};
+            let nearestLoc = null;
+            let nearestDist = Infinity;
+            for (const [name, loc] of Object.entries(locs)) {
+              const dx = loc.x - clickX;
+              const dy = loc.y - clickY;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < nearestDist) {
+                nearestDist = dist;
+                nearestLoc = name;
+              }
+            }
+            if (nearestLoc) state.location = nearestLoc;
+          } catch {}
+
           // Show description in speech bubble
           if (!preReactionState) {
-            preReactionState = { mood: state.mood, status: state.status };
+            preReactionState = { mood: state.mood, status: state.status, location: state.location };
           }
           state.status = desc;
           fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
@@ -491,6 +510,7 @@ const server = http.createServer(async (req, res) => {
               if (cur.status === desc) {
                 cur.mood = restoreTo.mood;
                 cur.status = restoreTo.status;
+                if (restoreTo.location) cur.location = restoreTo.location;
                 fs.writeFileSync(STATE_FILE, JSON.stringify(cur, null, 2) + '\n');
               }
             } catch {}
